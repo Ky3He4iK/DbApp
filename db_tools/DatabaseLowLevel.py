@@ -150,7 +150,9 @@ class DatabaseLowLevel:
 
         # если есть фильтрация, то добавить ее в запрос
         if filter_columns is not None:
-            query += " WHERE " + self._construct_condition(filter_columns, filter_values)
+            where = self._construct_condition(filter_columns, filter_values)
+            if len(where) > 0:
+                query += " WHERE " + where
         if order_by is not None:
             query += " ORDER BY " + self._to_str(order_by)
         query += rest

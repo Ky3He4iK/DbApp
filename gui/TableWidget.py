@@ -12,12 +12,18 @@ class TableWidget(QtWidgets.QWidget):
         self.layout_ = QtWidgets.QVBoxLayout()
 
         self.table_info = table_info_data[table]
-        self.data = self.db.get_all(self.table_info)
+        # self.data = self.db.get_all(self.table_info)
+        self.data = []
+        self.modifying = False
 
+        self.search_widget = QtWidgets.QTableWidget()
         self.table_widget = QtWidgets.QTableWidget()
         self.table_widget.setColumnCount(len(self.table_info.primary_keys) + len(self.table_info.other_fields))
+        self.search_widget.setColumnCount(self.table_widget.columnCount())
+        self.search_widget.setRowCount(1)
         self.table_widget.setHorizontalHeaderLabels(self.table_info.primary_keys + self.table_info.other_fields)
         self.table_widget.horizontalHeader().setVisible(True)
+        self.layout_.addWidget(self.search_widget)
         self.layout_.addWidget(self.table_widget)
 
         self.button_plus = QtWidgets.QPushButton(None, "Add")
@@ -30,6 +36,7 @@ class TableWidget(QtWidgets.QWidget):
         self.layout_.addWidget(self.button_minus)
 
         self.table_widget.cellChanged.connect(self.on_cell_changed)
+        self.search_widget.cellChanged.connect(self.on_search_cell_changed)
         self.setLayout(self.layout_)
         self.show()
 
@@ -37,15 +44,13 @@ class TableWidget(QtWidgets.QWidget):
 
     @QtCore.Slot()
     def plus_clicked(self):
-        # self.data.append()
         new_entry = self.db.get_all(self.table_info)[-1]
-        setattr(new_entry, self.table_info.primary_keys[0], getattr(new_entry, self.table_info.primary_keys[0]) + 1)
-        self.data.append(self.db.get_all(self.table_info)[-1])
+        for key in self.table_info.primary_keys:
+            setattr(new_entry, key, getattr(new_entry, key) + 1)
+        # self.data.append(self.db.get_all(self.table_info)[-1])
         self.db.insert(new_entry, self.table_info)
-        i = self.table_widget.rowCount()
-        self.table_widget.setRowCount(i + 1)
-        for j, field in enumerate(self.table_info.primary_keys + self.table_info.other_fields):
-            self.table_widget.setItem(i, j, QtWidgets.QTableWidgetItem(getattr(new_entry, field)))
+        self.apply_filters()
+
         print("plus " + self.table)
 
     @QtCore.Slot()
@@ -57,11 +62,13 @@ class TableWidget(QtWidgets.QWidget):
             return
         row = rows[0]
         self.db.remove(self.data[row], self.table_info)
-        self.table_widget.removeRow(row)
-        self.data = self.data[:row] + self.data[row + 1:]
+        # self.data = self.data[:row] + self.data[row + 1:]
+        self.apply_filters()
 
     @QtCore.Slot()
     def on_cell_changed(self, row: int, column: int):
+        if self.modifying:
+            return
         field = (self.table_info.primary_keys + self.table_info.other_fields)[column]
         try:
             item = self.table_widget.item(row, column)
@@ -76,23 +83,39 @@ class TableWidget(QtWidgets.QWidget):
                 field_value = item.text()
             setattr(self.data[row], field, field_value)
             self.db.update(self.data[row], self.table_info)
+            self.apply_filters()
         except Exception as e:
             print(e)
             ExceptionDialog(e).exec_()
             self.table_widget.item(row, column).setText(str(getattr(self.data[row], field)))
             print("error " + self.table)
+            self.apply_filters()
+
+    @QtCore.Slot()
+    def on_search_cell_changed(self, row: int, column: int):
+        self.apply_filters()
 
     def activated(self):
         print("activated " + self.table)
-        self.data = self.db.get_all(self.table_info)
-        self.table_widget.clearContents()
-        self.table_widget.setRowCount(len(self.data))
-        for i, row in enumerate(self.data):
-            for j, field in enumerate(self.table_info.primary_keys + self.table_info.other_fields):
-                self.table_widget.setItem(i, j, QtWidgets.QTableWidgetItem(self.safe_get(row, field)))
+        # self.data = self.db.get_all(self.table_info)
+        for j, field in enumerate(self.table_info.primary_keys + self.table_info.other_fields):
+            self.search_widget.setItem(0, j, QtWidgets.QTableWidgetItem(""))
+        self.apply_filters()
 
     def safe_get(self, obj, field):
         res = getattr(obj, field)
         if res is None:
             return ""
         return str(res)
+
+    def apply_filters(self):
+        self.modifying = True
+        filters = [self.search_widget.item(0, i) for i in range(self.search_widget.columnCount())]
+        filters = [None if filter is None or len(filter.text()) == 0 else filter.text() for filter in filters]
+        self.data = self.db.search(self.table_info.class_constructor(*filters), self.table_info)
+        self.table_widget.clearContents()
+        self.table_widget.setRowCount(len(self.data))
+        for i, row in enumerate(self.data):
+            for j, field in enumerate(self.table_info.primary_keys + self.table_info.other_fields):
+                self.table_widget.setItem(i, j, QtWidgets.QTableWidgetItem(self.safe_get(row, field)))
+        self.modifying = False
