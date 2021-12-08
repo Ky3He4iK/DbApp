@@ -22,6 +22,7 @@ class TableWidget(QtWidgets.QWidget):
         self.search_widget.setColumnCount(self.table_widget.columnCount())
         self.search_widget.setRowCount(1)
         self.table_widget.setHorizontalHeaderLabels(self.table_info.primary_keys + self.table_info.other_fields)
+        self.search_widget.setHorizontalHeaderLabels(self.table_info.primary_keys + self.table_info.other_fields)
         self.table_widget.horizontalHeader().setVisible(True)
         self.layout_.addWidget(self.search_widget)
         self.layout_.addWidget(self.table_widget)
