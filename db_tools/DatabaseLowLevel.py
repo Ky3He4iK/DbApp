@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Optional, Union, Iterable, List, Callable
+from datetime import datetime
+from typing import Optional, Union, Iterable, List, Callable, Type
 import logging
 import os
 from typing import TypeVar
@@ -12,12 +13,15 @@ STR_OR_ITER = Union[str, Iterable[str]]
 STR_OR_INT_OR_ITER = Union[STR_OR_INT, Iterable[STR_OR_INT]]
 T = TypeVar('T')  # generic variable
 
+
 @dataclass
 class TableInfo:
     name: str
     primary_keys: List[str]
     # foreign_keys: Optional[List[str, str, str]]  # # field name - origin table - origin name
     other_fields: List[str]
+    primary_types: List[Type]
+    other_types: List[Type]
     class_constructor: Optional[Callable[[List], object]] = None
 
 
@@ -30,7 +34,8 @@ class DatabaseLowLevel:
 
         self._base: mysql.connector.MySQLConnection = mysql.connector.connect(
             host='localhost', user=os.environ.get("MARIADB_USER"),
-            password=os.environ.get("MARIADB_PASSWORD")
+            password=os.environ.get("MARIADB_PASSWORD"),
+            database='plate_manufacturing'
         )
 
     def close(self):
@@ -71,16 +76,16 @@ class DatabaseLowLevel:
     def filter(self, obj: T, table_info: TableInfo, order_by: Optional[str] = None) -> List[T]:
         fields_map = {c: getattr(obj, c) for c in table_info.primary_keys if getattr(obj, c) is not None}
         return self._create_list_objects(self._select(table_info.name, fields_map.keys(), fields_map.values(),
-                                                      order_by), table_info)
+                                                      order_by=order_by), table_info)
 
     def search(self, obj: T, table_info: TableInfo, order_by: Optional[str] = None) -> List[T]:
         fields_map = {c: getattr(obj, c) for c in table_info.primary_keys if getattr(obj, c) is not None}
         fields_map.update({c: getattr(obj, c) for c in table_info.other_fields if getattr(obj, c) is not None})
         return self._create_list_objects(self._select(table_info.name, fields_map.keys(), fields_map.values(),
-                                                      order_by), table_info)
+                                                      order_by=order_by), table_info)
 
     def get_all(self, table_info: TableInfo, order_by: Optional[str] = None) -> List[T]:
-        return self._create_list_objects(self._select(table_info.name, None, None, order_by), table_info)
+        return self._create_list_objects(self._select(table_info.name, None, None, order_by=order_by), table_info)
 
     def remove(self, obj: T, table_info: TableInfo) -> None:
         columns = table_info.primary_keys
@@ -88,8 +93,8 @@ class DatabaseLowLevel:
         return self._delete(table_info.name, columns, fields)
 
     @staticmethod
-    def _create_list_objects(contents: List[Iterable], table_info: TableInfo) -> List[T]:
-        if table_info.class_constructor is None:
+    def _create_list_objects(contents: Optional[List[Iterable]], table_info: TableInfo) -> List[T]:
+        if table_info.class_constructor is None or contents is None:
             return []
         return list(map(lambda content: table_info.class_constructor(*content), contents))
 
@@ -100,6 +105,7 @@ class DatabaseLowLevel:
             with self._base.cursor() as cursor:
                 cursor.execute(query)
                 res = cursor.fetchall()
+                self._base.commit()
             return res
         except Exception as e:
             logging.error('Error: {} ({}) caused by query `{}`'.format(e, type(e), query))
@@ -240,5 +246,7 @@ class DatabaseLowLevel:
             return "null"
         elif isinstance(val, str):
             return "'" + val.replace("'", "''") + "'"
+        elif isinstance(val, datetime):
+            return "'" + str(val) + "'"
         else:
             return str(val).replace("'", "''")

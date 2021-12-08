@@ -1,17 +1,17 @@
 from datetime import datetime
 import typing
 
-from DatabaseLowLevel import *
+from .DatabaseLowLevel import *
 
 
 {{tables.begin}}
 @dataclass
 class {{name_cc}}:
     {{primaries.begin}}
-    {{primary.name_pc}}: {{primary.type}}
+    {{primary.name_cc}}: {{primary.type}}
     {{primaries.end}}
     {{others.begin}}
-    {{other.name_pc}}: {{other.type}}
+    {{other.name_cc}}: {{other.type}}
     {{others.end}}
 {{tables.end}}
 
@@ -19,9 +19,11 @@ class {{name_cc}}:
 table_info_data = {
 {{tables.begin}}
     '{{name_pc}}': TableInfo(
-        '{{name_pc}}',
+        '{{name_cc}}',
         [{{primaries.begin}}'{{primary.name_cc}}', {{primaries.end}}],
         [{{others.begin}}'{{other.name_cc}}', {{others.end}}],
+        [{{primaries.begin}}{{primary.type}}, {{primaries.end}}],
+        [{{others.begin}}{{other.type}}, {{others.end}}],
         {{name_cc}}
     ),
 {{tables.end}}
