@@ -195,7 +195,7 @@ def main():
     commands = map(lambda x: x.strip('\n '), open('db_tools/create_db.sql').read().split(';'))
     # for cmd in filter(lambda cmd: cmd.startswith('CREATE'), commands):
     #     print(parse_create_table(cmd))
-    class_info_pre = map(parse_create_table, filter(lambda cmd: cmd.startswith('CREATE'), commands))
+    class_info_pre = map(parse_create_table, filter(lambda cmd: cmd.startswith('CREATE TABLE'), commands))
     class_info = process_class_info(class_info_pre)
     print('\n'.join(map(str, class_info)))
     dao_text = process_template_fragment(open('db_tools/DAO_Template.py').read(), class_info, ProcessContext())

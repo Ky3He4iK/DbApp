@@ -68,19 +68,19 @@ class DatabaseLowLevel:
             return table_info.class_constructor(*res[0])
         return None
 
-    def filter(self, obj: T, table_info: TableInfo) -> List[T]:
+    def filter(self, obj: T, table_info: TableInfo, order_by: Optional[str] = None) -> List[T]:
         fields_map = {c: getattr(obj, c) for c in table_info.primary_keys if getattr(obj, c) is not None}
-        return self._create_list_objects(self._select(table_info.name, fields_map.keys(), fields_map.values()),
-                                         table_info)
+        return self._create_list_objects(self._select(table_info.name, fields_map.keys(), fields_map.values(),
+                                                      order_by), table_info)
 
-    def search(self, obj: T, table_info: TableInfo) -> List[T]:
+    def search(self, obj: T, table_info: TableInfo, order_by: Optional[str] = None) -> List[T]:
         fields_map = {c: getattr(obj, c) for c in table_info.primary_keys if getattr(obj, c) is not None}
         fields_map.update({c: getattr(obj, c) for c in table_info.other_fields if getattr(obj, c) is not None})
-        return self._create_list_objects(self._select(table_info.name, fields_map.keys(), fields_map.values()),
-                                         table_info)
+        return self._create_list_objects(self._select(table_info.name, fields_map.keys(), fields_map.values(),
+                                                      order_by), table_info)
 
-    def get_all(self, table_info: TableInfo) -> List[T]:
-        return self._create_list_objects(self._select(table_info.name, None, None), table_info)
+    def get_all(self, table_info: TableInfo, order_by: Optional[str] = None) -> List[T]:
+        return self._create_list_objects(self._select(table_info.name, None, None, order_by), table_info)
 
     def remove(self, obj: T, table_info: TableInfo) -> None:
         columns = table_info.primary_keys
@@ -117,7 +117,8 @@ class DatabaseLowLevel:
                 filter_columns: Optional[STR_OR_ITER],
                 filter_values: Optional[STR_OR_INT_OR_ITER],
                 rest: str = "",
-                select_columns: Optional[Iterable[str]] = None
+                select_columns: Optional[Iterable[str]] = None,
+                order_by: Optional[str] = None
                 ) -> List[tuple]:
         """
         выполнение запроса SELECT к БД - получение записей из таблицы
@@ -144,6 +145,8 @@ class DatabaseLowLevel:
         # если есть фильтрация, то добавить ее в запрос
         if filter_columns is not None:
             query += " WHERE " + self._construct_condition(filter_columns, filter_values)
+        if order_by is not None:
+            query += " ORDER BY " + self._to_str(order_by)
         query += rest
 
         return self.execute(query)
